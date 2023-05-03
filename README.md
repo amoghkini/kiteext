@@ -1,5 +1,7 @@
 # Extension for Python KiteConnect API from Zerodha
 
+## Note: This repository is a clone of the original repository from GitLab(https://gitlab.com/algo2t/kiteext) and is now hosted on GitHub. All credits and copyrights belong to their respective owner.
+
 ## Installation
 
 ### Make sure that git is installed on your system

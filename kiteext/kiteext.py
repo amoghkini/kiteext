@@ -5,7 +5,7 @@ import requests
 import urllib.parse
 from os import path
 import kiteconnect.exceptions as ex
-from six.moves.urllib.parse import urljoin
+from urllib.parse import urljoin
 from kiteconnect import KiteConnect, KiteTicker
 
 log = logging.getLogger(__name__)
@@ -19,27 +19,40 @@ class KiteExt(KiteConnect):
     def login_with_credentials(self, userid: str, password: str, secret: str) -> None:
         self.user_id = userid
         self.password = password
+        if (self.user_id == None) or (self.password == None):
+            raise ValueError("Please provide the valid username and password")
+        
         if len(secret) == 32:
-            self.twofa = KiteExt.totp(secret)
+            try:
+                self.twofa = KiteExt.totp(secret)
+            except Exception as e:
+                raise ValueError("TOTP Secret Key contains Non-base32 digit")
         else:
             raise ValueError("Incorrect TOTP BASE32 Secret Key")
+        
         self.reqsession = requests.Session()
-        r = self.reqsession.post(
-            self.root + self._routes["api.login"],
+        response = self.reqsession.post(
+            self.root + self._routes.get("api.login"),
             data={"user_id": self.user_id, "password": self.password},
         )
-        r = self.reqsession.post(
+        if response.status_code != 200:
+            raise ValueError(response.json().get('message').rstrip('.'))
+
+        response = self.reqsession.post(
             self.root + self._routes["api.twofa"],
             data={
-                "user_id": r.json()["data"]["user_id"],
-                "request_id": r.json()["data"]["request_id"],
+                "user_id": response.json().get("data").get("user_id"),
+                "request_id": response.json().get("data").get("request_id"),
                 "twofa_value": self.twofa,
                 "skip_session": "true",
             },
         )
-        self.enctoken = r.cookies.get("enctoken")
-        self.public_token = r.cookies.get("public_token")
-        self.user_id = r.cookies.get("user_id")
+        if response.status_code != 200:
+            raise ValueError(response.json().get('message'))
+        
+        self.enctoken = response.cookies.get("enctoken")
+        self.public_token = response.cookies.get("public_token")
+        self.user_id = response.cookies.get("user_id")
         self.headers["Authorization"] = "enctoken {}".format(self.enctoken)
 
     def login_using_enctoken(
